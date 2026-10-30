@@ -1,0 +1,77 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Event {
+  id            String         @id @default(uuid())
+  title         String
+  eventType     String         // "WEDDING" | "BIRTHDAY" | "COMMUNITY"
+  date          DateTime
+  location      String
+  totalBudget   Float
+  currency      String         @default("USD")
+  guestCount    Int
+  vibeTheme     String
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  budgetItems   BudgetItem[]
+  timelineItems TimelineItem[]
+  vendors       Vendor[]
+  creativeIdeas CreativeIdea[]
+}
+
+model BudgetItem {
+  id         String   @id @default(uuid())
+  eventId    String
+  category   String   // e.g. "Venue", "Catering", "Decor", "Logistics"
+  name       String
+  allocated  Float
+  spent      Float    @default(0.0)
+  priority   String   @default("HIGH") // "CRITICAL" | "HIGH" | "MEDIUM" | "OPTIONAL"
+  notes      String?
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model TimelineItem {
+  id          String   @id @default(uuid())
+  eventId     String
+  title       String
+  phase       String   // "PLANNING" | "FINAL_PREP" | "DAY_OF" | "POST_EVENT"
+  daysOffset  Int      // Days before event (e.g. -180 for 6 months prior, 0 for day-of)
+  targetTime  String?  // e.g. "14:00" for day-of run sheets
+  status      String   @default("PENDING") // "PENDING" | "IN_PROGRESS" | "COMPLETED"
+  description String?
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Vendor {
+  id           String   @id @default(uuid())
+  eventId      String
+  category     String   // e.g. "Photography", "Catering", "Sound & Lighting"
+  name         String
+  estimatedCost Float
+  actualCost   Float?
+  status       String   @default("NOT_CONTACTED") // "NOT_CONTACTED" | "INQUIRY_SENT" | "CONTRACT_SIGNED" | "PAID"
+  contactEmail String?
+  contactPhone String?
+  rfpNotes     String?
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model CreativeIdea {
+  id        String   @id @default(uuid())
+  eventId   String
+  type      String   // "THEME_CONCEPT" | "PALETTE" | "ACTIVITY" | "COPYWRITING"
+  title     String
+  content   String
+  tags      String?  // comma-separated
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
