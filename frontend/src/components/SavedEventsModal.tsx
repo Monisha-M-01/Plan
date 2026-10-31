@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Calendar, DollarSign, Users, MapPin, Trash2, ArrowRight, X, Clock, Layers, Loader2 } from "lucide-react";
+import { API_BASE } from "../services/api";
 
 interface SavedEventsModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ export function SavedEventsModal({ isOpen, onClose, onSelectEvent }: SavedEvents
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("http://localhost:8000/api/events");
+      const res = await fetch(`${API_BASE}/api/events`);
       if (!res.ok) throw new Error("Failed to load saved events");
       const data = await res.json();
       setEvents(data.events || []);
@@ -38,7 +39,7 @@ export function SavedEventsModal({ isOpen, onClose, onSelectEvent }: SavedEvents
   const handleOpenEvent = async (id: string) => {
     setLoadingEventId(id);
     try {
-      const res = await fetch(`http://localhost:8000/api/events/${id}`);
+      const res = await fetch(`${API_BASE}/api/events/${id}`);
       if (!res.ok) throw new Error("Could not retrieve event details");
       const data = await res.json();
       onSelectEvent(data.event);
@@ -55,7 +56,7 @@ export function SavedEventsModal({ isOpen, onClose, onSelectEvent }: SavedEvents
     if (!confirm("Are you sure you want to delete this saved event?")) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`http://localhost:8000/api/events/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/events/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
       setEvents((prev) => prev.filter((it) => it.id !== id));
     } catch (err: any) {
@@ -196,3 +197,4 @@ export function SavedEventsModal({ isOpen, onClose, onSelectEvent }: SavedEvents
     </div>
   );
 }
+

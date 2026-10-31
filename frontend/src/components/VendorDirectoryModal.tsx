@@ -261,3 +261,4 @@ export function VendorDirectoryModal({ isOpen, onClose }: VendorDirectoryModalPr
     </div>
   );
 }
+

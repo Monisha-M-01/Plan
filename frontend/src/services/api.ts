@@ -1,6 +1,6 @@
 import { PlanGenerationRequest, EventDetail } from "../types";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export async function generatePlan(request: PlanGenerationRequest): Promise<{ eventId: string }> {
   const res = await fetch(`${API_BASE}/api/plan/generate`, {
@@ -23,4 +23,3 @@ export async function fetchEvent(eventId: string): Promise<EventDetail> {
   const data = await res.json();
   return data.event;
 }
-

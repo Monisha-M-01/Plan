@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   ArrowRight,
 } from "lucide-react";
+import { API_BASE } from "../services/api";
 
 export interface EventFormData {
   title: string;
@@ -93,7 +94,7 @@ export function EventWizard({
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/plan/generate", {
+      const res = await fetch(`${API_BASE}/api/plan/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -101,7 +102,7 @@ export function EventWizard({
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Plan generation failed.");
 
-      const eventRes = await fetch(`http://localhost:8000/api/events/${data.eventId}`);
+      const eventRes = await fetch(`${API_BASE}/api/events/${data.eventId}`);
       const eventJson = await eventRes.json();
       onPlanCreated(eventJson.event);
     } catch (err: any) {
