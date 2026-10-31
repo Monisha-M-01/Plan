@@ -50,6 +50,13 @@ declare module "lucide-react" {
   export const ChevronDown: LucideIcon;
   export const ChevronUp: LucideIcon;
   export const TrendingUp: LucideIcon;
+  export const Trash2: LucideIcon;
+  export const Search: LucideIcon;
+  export const Filter: LucideIcon;
+  export const Phone: LucideIcon;
+  export const Star: LucideIcon;
+  export const BookOpen: LucideIcon;
+  export const Bookmark: LucideIcon;
 
   const icons: { [key: string]: LucideIcon };
   export default icons;

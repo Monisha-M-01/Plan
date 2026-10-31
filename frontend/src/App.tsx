@@ -4,10 +4,14 @@ import { Header } from "./components/Header";
 import { EventWizard, EventFormData } from "./components/EventWizard";
 import { PlanPreview } from "./components/PlanPreview";
 import { ResultsTabs } from "./components/ResultsTabs";
+import { SavedEventsModal } from "./components/SavedEventsModal";
+import { VendorDirectoryModal } from "./components/VendorDirectoryModal";
 
 export default function App() {
   const [currentEvent, setCurrentEvent] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showSavedEvents, setShowSavedEvents] = useState(false);
+  const [showVendorDirectory, setShowVendorDirectory] = useState(false);
 
   const [formData, setFormData] = useState<EventFormData>({
     title: "Golden Hour Terrace Reception",
@@ -35,6 +39,19 @@ export default function App() {
     }
   };
 
+  const handleSelectSavedEvent = (eventData: any) => {
+    setCurrentEvent(eventData);
+    setShowSavedEvents(false);
+    try {
+      confetti({
+        particleCount: 50,
+        spread: 45,
+        origin: { y: 0.5 },
+        colors: ["#F9A66C", "#FFE9D6", "#C2561A"],
+      });
+    } catch {}
+  };
+
   const currentStep = currentEvent ? "review" : loading ? "generate" : "details";
 
   return (
@@ -47,7 +64,15 @@ export default function App() {
       </div>
 
       {/* Slim, full-width header */}
-      <Header currentStep={currentStep} />
+      <Header
+        currentStep={currentStep}
+        onOpenSavedEvents={() => setShowSavedEvents(true)}
+        onOpenVendorDirectory={() => setShowVendorDirectory(true)}
+        onNavigatePlanner={() => {
+          setShowSavedEvents(false);
+          setShowVendorDirectory(false);
+        }}
+      />
 
       {/* Main Product Workspace Shell */}
       <main className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-8 py-8 flex-1">
@@ -93,6 +118,19 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Saved Events Registry Modal */}
+      <SavedEventsModal
+        isOpen={showSavedEvents}
+        onClose={() => setShowSavedEvents(false)}
+        onSelectEvent={handleSelectSavedEvent}
+      />
+
+      {/* Vendor Directory Modal */}
+      <VendorDirectoryModal
+        isOpen={showVendorDirectory}
+        onClose={() => setShowVendorDirectory(false)}
+      />
 
       {/* Full-Width Slim Product Footer */}
       <footer className="relative z-10 w-full border-t border-[#F3D3B8]/80 bg-white/50 backdrop-blur-xs py-5 text-xs text-[#9A8878]">

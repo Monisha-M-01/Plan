@@ -114,3 +114,4 @@ CORS_ORIGINS="http://localhost:5173,http://localhost:3000"
 
 ## 📄 License
 MIT © 2026 EventCraft AI
+

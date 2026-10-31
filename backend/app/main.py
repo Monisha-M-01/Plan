@@ -92,6 +92,31 @@ def create_event_plan(req: PlanGenerationRequest, db: Session = Depends(get_db))
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/events")
+def list_events(db: Session = Depends(get_db)):
+    events = db.query(Event).order_by(Event.created_at.desc()).all()
+    return {
+        "events": [
+            {
+                "id": e.id,
+                "title": e.title,
+                "eventType": e.event_type,
+                "date": e.date,
+                "location": e.location,
+                "totalBudget": e.total_budget,
+                "currency": e.currency,
+                "guestCount": e.guest_count,
+                "summary": e.summary,
+                "vibeTheme": e.vibe_theme,
+                "createdAt": e.created_at.isoformat() if e.created_at else None,
+                "budgetCount": len(e.budget_items),
+                "milestoneCount": len(e.milestones),
+                "vendorCount": len(e.vendors),
+            }
+            for e in events
+        ]
+    }
+
 @app.get("/api/events/{event_id}")
 def get_event(event_id: str, db: Session = Depends(get_db)):
     event = db.query(Event).filter(Event.id == event_id).first()
@@ -118,3 +143,32 @@ def get_event(event_id: str, db: Session = Depends(get_db)):
         }
     }
 
+@app.delete("/api/events/{event_id}")
+def delete_event(event_id: str, db: Session = Depends(get_db)):
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    db.delete(event)
+    db.commit()
+    return {"success": True, "deletedId": event_id}
+
+@app.get("/api/vendors")
+def list_vendors(db: Session = Depends(get_db)):
+    vendors = db.query(VendorItem).all()
+    vendor_list = []
+    seen = set()
+    for v in vendors:
+        key = (v.category, v.role_name)
+        if key not in seen:
+            seen.add(key)
+            vendor_list.append({
+                "id": v.id,
+                "category": v.category,
+                "roleName": v.role_name,
+                "estimatedCost": v.estimated_cost,
+                "inquiryTemplate": v.inquiry_template,
+                "questions": json.loads(v.questions_json or "[]"),
+                "eventTitle": v.event.title if v.event else None,
+                "eventDate": v.event.date if v.event else None,
+            })
+    return {"vendors": vendor_list}
