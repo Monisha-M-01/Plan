@@ -1,6 +1,15 @@
+"""AI Orchestration and Planning Engine for EventCraft AI.
+
+Integrates with Google Gemini API using structured response schemas,
+implements intelligent model fallback chains, response caching for efficiency,
+and provides a deterministic mathematical fallback planner.
+"""
+
+from __future__ import annotations
+import hashlib
 import json
 import logging
-from typing import Optional
+from typing import Optional, Dict, Tuple
 from google import genai
 from google.genai import types
 from app.config import GEMINI_API_KEY
@@ -15,7 +24,36 @@ from app.schemas import (
 
 logger = logging.getLogger(__name__)
 
+# In-memory LRU / fingerprint cache to maximize efficiency and eliminate redundant LLM calls
+_PLAN_CACHE: Dict[str, GenAIFullPlan] = {}
+_MAX_CACHE_SIZE = 128
+
+
+def compute_plan_cache_key(req: PlanGenerationRequest) -> str:
+    """Compute a deterministic hash for input parameters to support sub-millisecond caching."""
+    fingerprint = (
+        f"{req.eventType}|{req.title.strip().lower()}|{req.date}|{req.location.strip().lower()}|"
+        f"{req.totalBudget}|{req.currency}|{req.guestCount}|{req.vibeTheme.strip().lower()}"
+    )
+    return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+
+
+def get_cached_plan(cache_key: str) -> Optional[GenAIFullPlan]:
+    """Retrieve an existing plan from the cache if available."""
+    return _PLAN_CACHE.get(cache_key)
+
+
+def store_cached_plan(cache_key: str, plan: GenAIFullPlan) -> None:
+    """Store synthesized plan into memory cache with size bounds management."""
+    if len(_PLAN_CACHE) >= _MAX_CACHE_SIZE:
+        # Evict oldest entry
+        first_key = next(iter(_PLAN_CACHE))
+        _PLAN_CACHE.pop(first_key, None)
+    _PLAN_CACHE[cache_key] = plan
+
+
 def get_client() -> Optional[genai.Client]:
+    """Initialize Google GenAI client safely with credentials verification."""
     if not GEMINI_API_KEY:
         return None
     try:
@@ -24,12 +62,14 @@ def get_client() -> Optional[genai.Client]:
         logger.warning(f"Could not initialize GenAI client: {e}")
         return None
 
+
 def build_prompt(req: PlanGenerationRequest) -> str:
+    """Construct structured domain prompt with industry standards and mathematical constraints."""
     domain_rules = {
         "WEDDING": "Wedding Standards: 45-50% Venue/Catering, 12-15% Photography/Video, 10% Music/DJ, 10% Floral/Decor, 8% Attire/Beauty, 7% Planner/Contingency. Enforce reverse-chronological milestones from D-240 days down to D-Day run sheet.",
         "BIRTHDAY": "Birthday Standards: 35-40% Venue/Activities, 35% Food/Cake/Drinks, 15% Decor/Favors, 10% Entertainment/Invites.",
         "COMMUNITY": "Community Event Standards: Mandatory permits (D-90), insurance, public safety, stage/AV, sanitation, waste management, volunteer logistics."
-    }[req.eventType]
+    }.get(req.eventType, "General Event Standards: Balanced resource allocation across venue, dining, production, and contingency.")
 
     return f"""You are a Master Event Producer with 30 years experience.
 Create an exhaustive, mathematically coherent plan.
@@ -53,10 +93,21 @@ CONSTRAINTS:
 3. Generate copy-paste ready inquiry emails for vendors.
 """
 
-def generate_plan(req: PlanGenerationRequest) -> GenAIFullPlan:
+
+def generate_plan(req: PlanGenerationRequest) -> Tuple[GenAIFullPlan, bool]:
+    """Generate an event blueprint via Cache -> Gemini AI -> Deterministic fallback engine.
+    
+    Returns:
+        Tuple of (GenAIFullPlan, is_cached: bool)
+    """
+    cache_key = compute_plan_cache_key(req)
+    cached = get_cached_plan(cache_key)
+    if cached:
+        logger.info(f"Serving cached plan for key: {cache_key[:8]}")
+        return cached, True
+
     client = get_client()
     if client:
-        # Try candidate models supported by current API tier
         candidate_models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
         prompt = build_prompt(req)
         for model_name in candidate_models:
@@ -72,13 +123,18 @@ def generate_plan(req: PlanGenerationRequest) -> GenAIFullPlan:
                 )
                 data = json.loads(response.text)
                 plan = GenAIFullPlan.model_validate(data)
-                return reconcile_budget_arithmetic(plan)
+                reconciled = reconcile_budget_arithmetic(plan)
+                store_cached_plan(cache_key, reconciled)
+                return reconciled, False
             except Exception as ex:
                 logger.warning(f"Model {model_name} invocation failed: {ex}")
                 continue
 
-    # Deterministic domain fallback generator ensuring 100% availability and mathematically sound plans
-    return generate_fallback_plan(req)
+    # 100% Guaranteed mathematical domain fallback
+    fallback_plan = generate_fallback_plan(req)
+    store_cached_plan(cache_key, fallback_plan)
+    return fallback_plan, False
+
 
 def generate_fallback_plan(req: PlanGenerationRequest) -> GenAIFullPlan:
     """High-fidelity expert event planner fallback synthesis engine."""
@@ -92,7 +148,7 @@ def generate_fallback_plan(req: PlanGenerationRequest) -> GenAIFullPlan:
             BudgetItemGen(category="Contingency Reserve", name="Weather & Overrun Protection", percentage=10.0, priority="CRITICAL", notes="Dedicated reserve for weather contingencies and overtime staffing buffer."),
         ]
         milestones = [
-            MilestoneGen(title="Lock Estate Venue & Secure Date", phase="PLANNING", daysOffset=-180, targetTime="10:00 AM", description="Sign contract with Napa Valley estate terrace, submit initial 25% deposit, and review sound ordinance permits."),
+            MilestoneGen(title="Lock Estate Venue & Secure Date", phase="PLANNING", daysOffset=-180, targetTime="10:00 AM", description="Sign contract with estate terrace, submit initial 25% deposit, and review sound ordinance permits."),
             MilestoneGen(title="Tasting & Menu Finalization", phase="PLANNING", daysOffset=-120, targetTime="01:00 PM", description="Conduct seasonal food and wine tasting with the executive chef; lock in vegetarian/dietary options."),
             MilestoneGen(title="Lock Photographer & Entertainment", phase="PLANNING", daysOffset=-90, targetTime="03:00 PM", description="Contract photographer for 8-hour timeline and brief acoustic guitarist on ceremonial repertoire."),
             MilestoneGen(title="Dispatch Official Invitations", phase="PLANNING", daysOffset=-60, targetTime="09:00 AM", description="Send invitation suite with RSVP cards, dietary queries, and accommodations card."),
@@ -202,7 +258,9 @@ def generate_fallback_plan(req: PlanGenerationRequest) -> GenAIFullPlan:
     )
     return reconcile_budget_arithmetic(plan)
 
+
 def reconcile_budget_arithmetic(plan: GenAIFullPlan) -> GenAIFullPlan:
+    """Enforce exact mathematical 100.0% sum across all allocated budget categories."""
     items = plan.budgetBreakdown
     if not items:
         return plan
